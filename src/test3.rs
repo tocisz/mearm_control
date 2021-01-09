@@ -47,11 +47,11 @@ pub fn test3(mut client: Client) {
         loop {
             prev = dst;
 
-            let possible = find_valid_moves(&pos, &blockers, &is_empty, prev);
-            if !possible.is_empty() {
+            let valid_moves = find_valid_moves(&pos, &blockers, &is_empty, prev);
+            if !valid_moves.is_empty() {
                 {
                     let r: usize = rand::random();
-                    let (s, d) = possible.get(r % possible.len()).unwrap();
+                    let (s, d) = valid_moves.get(r % valid_moves.len()).unwrap();
                     src = *s;
                     dst = *d;
                 }
@@ -59,10 +59,11 @@ pub fn test3(mut client: Client) {
                 is_empty[src] = true;
                 is_empty[dst] = false;
             } else {
-                let possible_shift = find_valid_shifts(&pos, prev);
+                // if we can't move piece, for sure we can shift hand to somewhere
+                let valid_shifts = find_valid_shifts(&pos, prev);
                 {
                     let r: usize = rand::random();
-                    let d = possible_shift.get(r % possible_shift.len()).unwrap();
+                    let d = valid_shifts.get(r % valid_shifts.len()).unwrap();
                     dst = *d;
                 }
                 shift_hand(&mut client, pos.get(prev).unwrap(), pos.get(dst).unwrap());
@@ -79,6 +80,8 @@ fn dist(a: &(i16,i16), b: &(i16,i16)) -> i16 {
     ) as i16
 }
 
+// This is some approximation how much time is needed for the move
+// TODO wait for return message from robot arm instead
 fn dist2time(d: i16, s: i16) -> u64 {
     (i16::abs(d) as u64) * 1300 / 6 / (s as u64) + 100
 }

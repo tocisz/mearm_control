@@ -7,7 +7,7 @@ mod keyboard;
 
 use rumqttc::Client;
 
-use crate::keyboard::Msg;
+use keyboard::Msg;
 
 fn main() {
     // get_mqtt_options() should be defined in config.rs (but configuration data is not committed)
