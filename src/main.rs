@@ -119,17 +119,12 @@ fn shift_hand(client: &mut Client, p0: &(i16, i16), p1: &(i16, i16)) {
 }
 
 fn move_is_safe(p0: &(i16, i16), p1: &(i16, i16)) -> bool {
+    // https://mathworld.wolfram.com/Circle-LineIntersection.html
     let restricted_radius = 100f32;
-    let dst_2 = f32::powi(i16::abs(p1.0-p0.0) as f32, 2)
-        + f32::powi(i16::abs(p1.1-p0.1) as f32, 2);
-    let discr = (p0.0 as f32)*(p1.1 as f32) - (p0.1 as f32)*(p1.0 as f32);
-    let delta = f32::powi(restricted_radius, 2)*dst_2
-                    - f32::powi(discr, 2);
-    // println!("For ({},{}) -> ({},{}) dst_2 = {}, discr = {}", p0.0, p0.1, p1.0, p1.1, dst_2, discr);
-    // println!("For ({},{}) -> ({},{}) L = {}, R = {}", p0.0, p0.1, p1.0, p1.1, f32::powi(restricted_radius, 2)*dst_2, f32::powi(discr, 2));
-    // println!("For ({},{}) -> ({},{}) delta = {}", p0.0, p0.1, p1.0, p1.1, delta);
-    // println!();
-    return delta <= 0f32;
+    let squared_distance = f32::powi((p1.0-p0.0) as f32, 2)
+        + f32::powi((p1.1-p0.1) as f32, 2);
+    let det = (p0.0 as f32)*(p1.1 as f32) - (p0.1 as f32)*(p1.0 as f32);
+    return f32::powi(restricted_radius, 2) * squared_distance <= f32::powi(det, 2);
 }
 
 #[allow(dead_code)]
