@@ -90,10 +90,10 @@ fn dist2time(d: i16, s: i16) -> u64 {
 fn move_piece(client: &mut Client, p0: &(i16, i16), p1: &(i16, i16), p2: &(i16, i16)) {
     let high = 70;
     let empty_high = 30;
-    let med = 0;
+    let med = -15;
     let low = -30;
 
-    let move_speed = 10;
+    let move_speed = 30;
     let grip_speed = 200;
 
     let d0 = dist(p0, p1);
@@ -108,27 +108,58 @@ fn move_piece(client: &mut Client, p0: &(i16, i16), p1: &(i16, i16), p2: &(i16, 
     arm_grip(client, 180, grip_speed, 200);
     arm_move(client, p1.0, p1.1, h, move_speed, dist2time(h - low, move_speed));
     arm_move(client, p2.0, p2.1, h, move_speed, t1);
-    arm_move(client, p2.0, p2.1, low, move_speed, dist2time(h - low, move_speed));
+    if h != med {
+        arm_move(client, p2.0, p2.1, med, move_speed, 1500); // wait to stabilize
+    }
+    arm_move(client, p2.0, p2.1, low, move_speed, dist2time(med - low, move_speed));
     arm_grip(client, 110, grip_speed, 200);
     arm_move(client, p2.0, p2.1, empty_high, move_speed, dist2time(empty_high - low, move_speed));
 }
 
+fn move_is_safe(p0: &(i16, i16), p1: &(i16, i16)) -> bool {
+    let restricted_radius = 100f32;
+    let dst_2 = f32::powi(i16::abs(p1.0-p0.0) as f32, 2)
+        + f32::powi(i16::abs(p1.1-p0.1) as f32, 2);
+    let discr = (p0.0 as f32)*(p1.1 as f32) - (p0.1 as f32)*(p1.0 as f32);
+    let delta = f32::powi(restricted_radius, 2)*dst_2
+                    - f32::powi(discr, 2);
+    // println!("For ({},{}) -> ({},{}) dst_2 = {}, discr = {}", p0.0, p0.1, p1.0, p1.1, dst_2, discr);
+    // println!("For ({},{}) -> ({},{}) L = {}, R = {}", p0.0, p0.1, p1.0, p1.1, f32::powi(restricted_radius, 2)*dst_2, f32::powi(discr, 2));
+    // println!("For ({},{}) -> ({},{}) delta = {}", p0.0, p0.1, p1.0, p1.1, delta);
+    // println!();
+    return delta <= 0f32;
+}
+
 fn test3(mut client: Client) {
     let row0 = 120;
-    let row1 = 190;
+    let row1 = 180;
+    let res = 60;
     let pos: Vec<(i16, i16)> = vec![
-        (-120, row0),
-        (-60, row0),
-        (0, row0),
-        (60, row0),
-        (120, row0),
-        (-60, row1),
-        (0, row1+15),
-        (60, row1),
+        (-120, 120),
+        (-60, 120),
+        (0, 120),
+        (60, 120),
+        (120, 120),
+        (-60, 180),
+        (0, 180),
+        (60, 180),
         (120, 60),
         (120, 0),
+        (180, 60),
+        (180, 0),
         (-120, 60),
         (-120, 0),
+        (-180, 60),
+        (-180, 0),
+    ];
+    let blockers = vec![
+        (5,1),
+        (6,2),
+        (7,3),
+        (10,8),
+        (11,9),
+        (14,12),
+        (15,13)
     ];
     let mut is_empty = vec![true; pos.len()];
     let pebbles = 4;
@@ -136,28 +167,23 @@ fn test3(mut client: Client) {
         is_empty[i] = false;
     }
     let mut prev = 0;
-    let mut src = 1;
-    let mut dst = 1;
+    let mut src = 0;
+    let mut dst = 0;
     thread::spawn(move || {
         arm_move(&mut client, 0, row0, 30, 50, 1000);
         arm_grip(&mut client, 110, 50, 200);
         loop {
             prev = dst;
 
-            loop {
-                src = rand::random();
-                src = src % pos.len();
-                if src != prev && !is_empty[src] {
-                    break;
-                }
+            let possible = find_valid_moves(&pos, &blockers, &is_empty, prev);
+            if possible.is_empty() {
+                panic!("No valid moves");
             }
-
-            loop {
-                dst = rand::random();
-                dst = dst % pos.len();
-                if dst != src && is_empty[dst] {
-                    break;
-                }
+            {
+                let r: usize = rand::random();
+                let (s, d) = (possible.get(r % possible.len()).unwrap());
+                src = *s;
+                dst = *d;
             }
 
             move_piece(&mut client, pos.get(prev).unwrap(), pos.get(src).unwrap(), pos.get(dst).unwrap());
@@ -165,6 +191,40 @@ fn test3(mut client: Client) {
             is_empty[dst] = false;
         }
     });
+}
+
+fn find_valid_moves(pos: &Vec<(i16, i16)>, blockers: &Vec<(usize, usize)>, is_empty: &Vec<bool>, start: usize) -> Vec<(usize, usize)> {
+    let mut srcs = vec![];
+    for i in 0 .. is_empty.len() {
+        if i != start && !is_empty[i]
+            && move_is_safe(pos.get(start).unwrap(), pos.get(i).unwrap())
+            && no_blocker(blockers, is_empty, i) {
+            srcs.push(i);
+        }
+    }
+
+    let mut movs = vec![];
+    for i in srcs {
+        let mut picked = is_empty.clone();
+        picked[i] = true;
+        for j in 0 .. is_empty.len() {
+            if j != i && is_empty[j]
+                && move_is_safe(pos.get(i).unwrap(), pos.get(j).unwrap())
+                && no_blocker(blockers, &picked, j) {
+                movs.push((i,j));
+            }
+        }
+    }
+    movs
+}
+
+fn no_blocker(blockers: &Vec<(usize, usize)>, is_empty: &Vec<bool>, p: usize) -> bool {
+    for (s,d) in blockers {
+        if *s == p && !is_empty[*d] {
+            return false;
+        }
+    }
+    true
 }
 
 fn wait_for_key_press(mut m: Bus<Msg>) {
