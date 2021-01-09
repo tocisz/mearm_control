@@ -1,20 +1,12 @@
 mod config;
 
-use rumqttc::{MqttOptions, Client, QoS, Packet};
+use rumqttc::{Client, QoS};
 use std::time::Duration;
 use std::{thread, io};
-use std::sync::mpsc;
-use std::sync::mpsc::{Sender, Receiver};
 use byteorder::{ByteOrder, LittleEndian};
-
-use rumqttc::Event::Incoming;
-use std::thread::JoinHandle;
 
 use bus::{Bus, BusReader};
 use std::io::Read;
-
-use rand::prelude::*;
-use std::ops::Deref;
 
 const STEP: i16 = 10;
 
@@ -31,6 +23,7 @@ enum Msg {
     Open,
 }
 
+#[allow(dead_code)]
 fn test1(mut client: Client) {
     thread::spawn(move || loop {
         // arm_grip(&mut client, 90, 50, 100);
@@ -46,6 +39,7 @@ fn test1(mut client: Client) {
     });
 }
 
+#[allow(dead_code)]
 fn test2(mut client: Client, mut rx: BusReader<Msg>) {
     let mut pos: [i16; 3] = [0, 100, 50];
     let mut open = true;
@@ -138,10 +132,8 @@ fn move_is_safe(p0: &(i16, i16), p1: &(i16, i16)) -> bool {
     return delta <= 0f32;
 }
 
+#[allow(dead_code)]
 fn test3(mut client: Client) {
-    let row0 = 120;
-    let row1 = 180;
-    let res = 60;
     let pos: Vec<(i16, i16)> = vec![
         (-120, 120),
         (-60, 120),
@@ -174,11 +166,12 @@ fn test3(mut client: Client) {
     for i in 0..pebbles {
         is_empty[i] = false;
     }
-    let mut prev = 0;
-    let mut src = 0;
-    let mut dst = 0;
     thread::spawn(move || {
-        arm_move(&mut client, 0, row0, 30, 50, 1000);
+        let mut dst = 0;
+        let mut prev;
+        let mut src ;
+
+        arm_move(&mut client, 0, 120, 30, 50, 1000);
         arm_grip(&mut client, 110, 50, 200);
         loop {
             prev = dst;
@@ -252,38 +245,6 @@ fn no_blocker(blockers: &Vec<(usize, usize)>, is_empty: &Vec<bool>, p: usize) ->
     true
 }
 
-fn wait_for_key_press(mut m: Bus<Msg>) {
-    thread::spawn(move || {
-        let mut input = String::new();
-        loop {
-            input.truncate(0);
-            io::stdin().read_line(&mut input).unwrap();
-            input.truncate(input.len() - 1); // remove newline
-            // println!("You said '{}'", input);
-            if input == "exit" {
-                m.broadcast(Msg::STOP);
-                break;
-            } else if input == "u" {
-                m.broadcast(Msg::Up(STEP));
-            } else if input == "d" {
-                m.broadcast(Msg::Down(STEP));
-            } else if input == "l" {
-                m.broadcast(Msg::Left(STEP));
-            } else if input == "r" {
-                m.broadcast(Msg::Right(STEP));
-            } else if input == "f" {
-                m.broadcast(Msg::Front(STEP));
-            } else if input == "b" {
-                m.broadcast(Msg::Back(STEP));
-            } else if input == "c" {
-                m.broadcast(Msg::Close)
-            } else if input == "o" {
-                m.broadcast(Msg::Open)
-            }
-        }
-    });
-}
-
 fn wait_for_key_press2(mut m: Bus<Msg>) {
     thread::spawn(move || {
         for b in io::stdin().lock().bytes() {
@@ -314,7 +275,7 @@ fn wait_for_key_press2(mut m: Bus<Msg>) {
 
 fn main() {
     // get_mqtt_options() should be defined in config.rs (but configuration data is not committed)
-    let (mut client, mut connection) = Client::new(config::get_mqtt_options(), 10);
+    let (client, mut connection) = Client::new(config::get_mqtt_options(), 10);
     let mut b = bus::Bus::new(2);
     let mut rx = b.add_rx();
     // test2(client, b.add_rx());
@@ -322,7 +283,7 @@ fn main() {
     wait_for_key_press2(b);
 
     // Iterate to poll the eventloop for connection progress
-    for (i, notification) in connection.iter().enumerate() {
+    for (_i, _notification) in connection.iter().enumerate() {
         // println!("Notification = {:?}", notification);
         match rx.try_recv() {
             Ok(Msg::STOP) => {
