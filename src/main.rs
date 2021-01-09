@@ -108,12 +108,20 @@ fn move_piece(client: &mut Client, p0: &(i16, i16), p1: &(i16, i16), p2: &(i16, 
     arm_grip(client, 180, grip_speed, 200);
     arm_move(client, p1.0, p1.1, h, move_speed, dist2time(h - low, move_speed));
     arm_move(client, p2.0, p2.1, h, move_speed, t1);
-    if h != med {
-        arm_move(client, p2.0, p2.1, med, move_speed, 1500); // wait to stabilize
-    }
+    arm_move(client, p2.0, p2.1, med, move_speed, 1500); // wait to stabilize
     arm_move(client, p2.0, p2.1, low, move_speed, dist2time(med - low, move_speed));
     arm_grip(client, 110, grip_speed, 200);
     arm_move(client, p2.0, p2.1, empty_high, move_speed, dist2time(empty_high - low, move_speed));
+}
+
+fn shift_hand(client: &mut Client, p0: &(i16, i16), p1: &(i16, i16)) {
+    let empty_high = 30;
+    let move_speed = 30;
+
+    let d0 = dist(p0, p1);
+    let t0 = dist2time(d0, move_speed);
+
+    arm_move(client, p1.0, p1.1, empty_high, move_speed, t0);
 }
 
 fn move_is_safe(p0: &(i16, i16), p1: &(i16, i16)) -> bool {
@@ -176,26 +184,43 @@ fn test3(mut client: Client) {
             prev = dst;
 
             let possible = find_valid_moves(&pos, &blockers, &is_empty, prev);
-            if possible.is_empty() {
-                panic!("No valid moves");
+            if !possible.is_empty() {
+                {
+                    let r: usize = rand::random();
+                    let (s, d) = possible.get(r % possible.len()).unwrap();
+                    src = *s;
+                    dst = *d;
+                }
+                move_piece(&mut client, pos.get(prev).unwrap(), pos.get(src).unwrap(), pos.get(dst).unwrap());
+                is_empty[src] = true;
+                is_empty[dst] = false;
+            } else {
+                let possible_shift = find_valid_shifts(&pos, prev);
+                {
+                    let r: usize = rand::random();
+                    let d = possible_shift.get(r % possible_shift.len()).unwrap();
+                    dst = *d;
+                }
+                shift_hand(&mut client, pos.get(prev).unwrap(), pos.get(dst).unwrap());
             }
-            {
-                let r: usize = rand::random();
-                let (s, d) = (possible.get(r % possible.len()).unwrap());
-                src = *s;
-                dst = *d;
-            }
-
-            move_piece(&mut client, pos.get(prev).unwrap(), pos.get(src).unwrap(), pos.get(dst).unwrap());
-            is_empty[src] = true;
-            is_empty[dst] = false;
         }
     });
 }
 
+
+fn find_valid_shifts(pos: &Vec<(i16, i16)>, start: usize) -> Vec<usize> {
+    let mut shifts = vec![];
+    for i in 0 .. pos.len() {
+        if i != start && move_is_safe(pos.get(start).unwrap(), pos.get(i).unwrap()) {
+            shifts.push(i);
+        }
+    }
+    shifts
+}
+
 fn find_valid_moves(pos: &Vec<(i16, i16)>, blockers: &Vec<(usize, usize)>, is_empty: &Vec<bool>, start: usize) -> Vec<(usize, usize)> {
     let mut srcs = vec![];
-    for i in 0 .. is_empty.len() {
+    for i in 0 .. pos.len() {
         if i != start && !is_empty[i]
             && move_is_safe(pos.get(start).unwrap(), pos.get(i).unwrap())
             && no_blocker(blockers, is_empty, i) {
@@ -207,7 +232,7 @@ fn find_valid_moves(pos: &Vec<(i16, i16)>, blockers: &Vec<(usize, usize)>, is_em
     for i in srcs {
         let mut picked = is_empty.clone();
         picked[i] = true;
-        for j in 0 .. is_empty.len() {
+        for j in 0 .. pos.len() {
             if j != i && is_empty[j]
                 && move_is_safe(pos.get(i).unwrap(), pos.get(j).unwrap())
                 && no_blocker(blockers, &picked, j) {
