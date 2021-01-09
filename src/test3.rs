@@ -3,63 +3,6 @@ use rumqttc::Client;
 
 use crate::mov::*;
 
-fn dist(a: &(i16,i16), b: &(i16,i16)) -> i16 {
-    f32::sqrt(
-        f32::powi(i16::abs(b.0-a.0) as f32, 2)
-            + f32::powi(i16::abs(b.1-a.1) as f32, 2)
-    ) as i16
-}
-
-fn dist2time(d: i16, s: i16) -> u64 {
-    (i16::abs(d) as u64) * 1300 / 6 / (s as u64) + 100
-}
-
-fn move_piece(client: &mut Client, p0: &(i16, i16), p1: &(i16, i16), p2: &(i16, i16)) {
-    let high = 70;
-    let empty_high = 30;
-    let med = -15;
-    let low = -30;
-
-    let move_speed = 100;
-    let grip_speed = 200;
-
-    let d0 = dist(p0, p1);
-    let t0 = dist2time(d0, move_speed);
-    let d1 = dist(p1, p2);
-    let t1 = dist2time(d1, move_speed);
-    let short_move = d1 <= 75;
-    let h = if short_move { med } else { high };
-
-    arm_move(client, p1.0, p1.1, empty_high, move_speed, t0);
-    arm_move(client, p1.0, p1.1, low, move_speed, dist2time(low - empty_high, move_speed));
-    arm_grip(client, 180, grip_speed, 200);
-    arm_move(client, p1.0, p1.1, h, move_speed, dist2time(h - low, move_speed));
-    arm_move(client, p2.0, p2.1, h, move_speed, t1);
-    arm_move(client, p2.0, p2.1, med, move_speed, 1500); // wait to stabilize
-    arm_move(client, p2.0, p2.1, low, move_speed, dist2time(med - low, move_speed));
-    arm_grip(client, 110, grip_speed, 200);
-    arm_move(client, p2.0, p2.1, empty_high, move_speed, dist2time(empty_high - low, move_speed));
-}
-
-fn shift_hand(client: &mut Client, p0: &(i16, i16), p1: &(i16, i16)) {
-    let empty_high = 30;
-    let move_speed = 30;
-
-    let d0 = dist(p0, p1);
-    let t0 = dist2time(d0, move_speed);
-
-    arm_move(client, p1.0, p1.1, empty_high, move_speed, t0);
-}
-
-fn move_is_safe(p0: &(i16, i16), p1: &(i16, i16)) -> bool {
-    // https://mathworld.wolfram.com/Circle-LineIntersection.html
-    let restricted_radius = 100f32;
-    let squared_distance = f32::powi((p1.0-p0.0) as f32, 2)
-        + f32::powi((p1.1-p0.1) as f32, 2);
-    let det = (p0.0 as f32)*(p1.1 as f32) - (p0.1 as f32)*(p1.0 as f32);
-    return f32::powi(restricted_radius, 2) * squared_distance <= f32::powi(det, 2);
-}
-
 #[allow(dead_code)]
 pub fn test3(mut client: Client) {
     let pos: Vec<(i16, i16)> = vec![
@@ -128,6 +71,63 @@ pub fn test3(mut client: Client) {
     });
 }
 
+
+fn dist(a: &(i16,i16), b: &(i16,i16)) -> i16 {
+    f32::sqrt(
+        f32::powi(i16::abs(b.0-a.0) as f32, 2)
+            + f32::powi(i16::abs(b.1-a.1) as f32, 2)
+    ) as i16
+}
+
+fn dist2time(d: i16, s: i16) -> u64 {
+    (i16::abs(d) as u64) * 1300 / 6 / (s as u64) + 100
+}
+
+fn move_piece(client: &mut Client, p0: &(i16, i16), p1: &(i16, i16), p2: &(i16, i16)) {
+    let high = 70;
+    let empty_high = 30;
+    let med = -15;
+    let low = -30;
+
+    let move_speed = 100;
+    let grip_speed = 200;
+
+    let d0 = dist(p0, p1);
+    let t0 = dist2time(d0, move_speed);
+    let d1 = dist(p1, p2);
+    let t1 = dist2time(d1, move_speed);
+    let short_move = d1 <= 75;
+    let h = if short_move { med } else { high };
+
+    arm_move(client, p1.0, p1.1, empty_high, move_speed, t0);
+    arm_move(client, p1.0, p1.1, low, move_speed, dist2time(low - empty_high, move_speed));
+    arm_grip(client, 180, grip_speed, 200);
+    arm_move(client, p1.0, p1.1, h, move_speed, dist2time(h - low, move_speed));
+    arm_move(client, p2.0, p2.1, h, move_speed, t1);
+    arm_move(client, p2.0, p2.1, med, move_speed, 1500); // wait to stabilize
+    arm_move(client, p2.0, p2.1, low, move_speed, dist2time(med - low, move_speed));
+    arm_grip(client, 110, grip_speed, 200);
+    arm_move(client, p2.0, p2.1, empty_high, move_speed, dist2time(empty_high - low, move_speed));
+}
+
+fn shift_hand(client: &mut Client, p0: &(i16, i16), p1: &(i16, i16)) {
+    let empty_high = 30;
+    let move_speed = 30;
+
+    let d0 = dist(p0, p1);
+    let t0 = dist2time(d0, move_speed);
+
+    arm_move(client, p1.0, p1.1, empty_high, move_speed, t0);
+}
+
+fn move_is_safe(p0: &(i16, i16), p1: &(i16, i16)) -> bool {
+    // https://mathworld.wolfram.com/Circle-LineIntersection.html
+    let restricted_radius = 100f32;
+    let squared_distance = f32::powi((p1.0-p0.0) as f32, 2)
+        + f32::powi((p1.1-p0.1) as f32, 2);
+    let det = (p0.0 as f32)*(p1.1 as f32) - (p0.1 as f32)*(p1.0 as f32);
+    return f32::powi(restricted_radius, 2) * squared_distance <= f32::powi(det, 2);
+}
 
 fn find_valid_shifts(pos: &Vec<(i16, i16)>, start: usize) -> Vec<usize> {
     let mut shifts = vec![];
