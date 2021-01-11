@@ -48,10 +48,8 @@ fn main() {
     }
 }
 
-fn print_position(p0: &[u8]) {
-    let x = LittleEndian::read_i16(p0);
-    let y = LittleEndian::read_i16(&p0[2..]);
-    let z = LittleEndian::read_i16(&p0[4..]);
-    let g = LittleEndian::read_i16(&p0[6..]);
-    println!("Position: {} {} {} {}", x, y, z, g);
+fn print_position(d: &[u8]) {
+    let mut p = [0i16; 4];
+    LittleEndian::read_i16_into(d, &mut p);
+    println!("Position: {:?}", p);
 }
