@@ -13,18 +13,14 @@ enum CommandType {
 fn create_move_message(x: i16, y: i16, z: i16, s: i16) -> [u8; 9] {
     let mut buf = [0u8; 9];
     buf[0] = CommandType::MOVE as u8;
-    LittleEndian::write_i16(&mut buf[1..], x);
-    LittleEndian::write_i16(&mut buf[3..], y);
-    LittleEndian::write_i16(&mut buf[5..], z);
-    LittleEndian::write_i16(&mut buf[7..], s);
+    LittleEndian::write_i16_into(&[x,y,z,s],&mut buf[1..]);
     buf
 }
 
 fn create_grip_message(a: i16, s: i16) -> [u8; 5] {
     let mut buf = [0u8; 5];
     buf[0] = CommandType::GRIP as u8;
-    LittleEndian::write_i16(&mut buf[1..], a);
-    LittleEndian::write_i16(&mut buf[3..], s);
+    LittleEndian::write_i16_into(&[a,s],&mut buf[1..]);
     buf
 }
 
